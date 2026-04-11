@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventario | Hyundai Coatzacoalcos v2.5 (Fast UI + Archivo)</title>
+    <style>
+        :root {
+            --hyundai-blue: #002C5F;
+            --hyundai-light: #E4DCD3;
+            --bg-color: #F4F6F9;
+            --text-color: #333;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --table-font-size: 13px;
+        }
+        
+        html, body {
+            margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: var(--font-main);
+            background-color: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column;
+        }
+
+        .main-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 15px 20px; box-sizing: border-box; }
+
+        #login-section { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .pin-input { font-size: 24px; padding: 10px; width: 200px; text-align: center; border: 2px solid var(--hyundai-blue); border-radius: 5px;}
+        
+        #app-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .header-brand { color: var(--hyundai-blue); border-bottom: 3px solid var(--hyundai-blue); padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        .header-brand h2 { margin: 5px 0; font-size: 1.5em; }
+        
+        .table-container { flex: 1; overflow-y: auto; overflow-x: auto; background: white; border-radius: 4px; border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; font-size: var(--table-font-size); min-width: 1200px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle;}
+        th { background-color: var(--hyundai-blue); color: white; position: sticky; top: 0; z-index: 10;}
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        .status-apartado { background-color: #ffeeba !important; }
+        .status-vendido { background-color: #d1ecf1 !important; color: #0c5460; }
+        .alerta-antiguedad { background-color: #FCE4E4 !important; color: #721c24; }
+        
+        .table-input { width: 90%; border: 1px solid transparent; background: transparent; padding: 2px; font-size: var(--table-font-size); font-family: var(--font-main);}
+        .table-input:focus { border-color: var(--hyundai-blue); background-color: white; border-radius: 3px;}
+        
+        .footer-bar {
+            background-color: var(--hyundai-blue); color: white; padding: 8px 20px; box-sizing: border-box;
+            display: flex; flex-direction: column; box-shadow: 0 -4px 6px rgba(0,0,0,0.2);
+        }
+        .footer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap;}
+        .footer-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+        
+        .kpi-container { display: flex; gap: 15px; }
+        .kpi-card { background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 4px; text-align: center; color: white; font-weight: bold; font-size: 0.85em; display: flex; flex-direction: column; justify-content: center;}
+        .kpi-card span { font-size: 1.4em; margin-top: 2px; }
+
+        select, input, .btn { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; font-family: var(--font-main);}
+        .btn { background-color: var(--hyundai-light); color: var(--hyundai-blue); cursor: pointer; border: none; font-weight: bold; transition: 0.3s;}
+        .btn:hover { background-color: #f7f3ed; }
+        .btn-success { background-color: #28a745; color: white;}
+        .btn-success:hover { background-color: #218838; }
+        .btn-danger { background-color: #dc3545; color: white;}
+        .btn-warning { background-color: #ffc107; color: #856404;}
+        .btn-warning:hover { background-color: #e0a800; }
+        
+        #loading { text-align: center; display: none; color: white; font-weight: bold; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,44,95,0.8); padding: 5px 15px; border-radius: 15px; z-index: 200;}
+        
+        /* Mini indicador de guardado en segundo plano */
+        #mini-loading { position: fixed; bottom: 130px; right: 20px; background: rgba(40, 167, 69, 0.9); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; display: none; z-index: 150; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="login-section">
+            <h2 style="color: #002C5F; margin-bottom: 20px;">Acceso a Inventario Digital</h2>
+            <input type="password" id="pin" class="pin-input" placeholder="PIN">
+            <br><br>
+            <button onclick="iniciarSesion()" style="padding: 10px 30px; font-size: 16px;" class="btn btn-success">Ingresar</button>
+            <p id="login-msg" style="color: red; margin-top: 15px;"></p>
+        </div>
+
+        <div id="app-section" style="display: none;">
+            <div class="header-brand">
+                <h2>Inventario Hyundai Coatzacoalcos</h2>
+                <div>
+                    Usuario: <span id="user-info" style="font-weight: bold;"></span> | <a href="#" onclick="location.reload()" style="color:var(--hyundai-blue); font-weight:bold;">Salir</a>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="tabla-inventario">
+                    <thead><tr id="table-headers"></tr></thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="fixed-footer" class="footer-bar" style="display: none;">
+        <div class="footer-top">
+            <div class="kpi-container">
+                <div class="kpi-card">Disponibles <span id="kpi-disp">0</span></div>
+                <div class="kpi-card">Allocation <span id="kpi-alloc">0</span></div>
+                <div class="kpi-card">Apartadas <span id="kpi-apart">0</span></div>
+                <div class="kpi-card">Demos <span id="kpi-demo">0</span></div>
+            </div>
+            
+            <div class="footer-controls">
+                <input type="text" id="filtro-texto" placeholder="Buscar general..." onkeyup="renderTable()">
+                <select id="filtro-tipo" onchange="renderTable()"><option value="">Todos los Tipos</option></select>
+                <select id="filtro-color" onchange="renderTable()"><option value="">Todos los Colores</option></select>
+                
+                <select id="filtro-visibilidad-gerencia" onchange="renderTable()" style="display: none;">
+                    <option value="activo">Inventario: Activo</option>
+                    <option value="todo">Inventario: Activo y Facturado</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content: space-between; align-items: flex-end;">
+            <div style="font-size:10px; color:rgba(255,255,255,0.7);">SISTEMA DE INVENTARIO V2.5 (Fast UI) | HYUNDAI COATZACOALCOS</div>
+            
+            <div id="panel-gerencia-botones" style="display: none; gap: 8px;">
+                <input type="file" id="file-csv" accept=".csv" style="display:none;" onchange="procesarCSV(event)">
+                <button onclick="document.getElementById('file-csv').click()" class="btn btn-success">Actualizar / Cargar CSV</button>
+                <button onclick="exportarExcel()" class="btn">Exportar a Excel</button>
+                <button onclick="archivarVendidos()" class="btn btn-warning">Archivar Vendidos</button>
+            </div>
+        </div>
+    </div>
+
+    <p id="loading">Sincronizando...</p>
+    <div id="mini-loading">✓ Guardando en la nube...</div>
+
+<script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzAsfmiOwFVgq082UwC4ZTh7faMk4M2zUnifYuJ_Go65P4DKGDzF3pGKTUGO5BwOKxx1A/exec';
+    let inventarioGlobal = [];
+    let usuarioActual = {};
+
+    async function apiCall(data) {
+        try {
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(data) });
+            return await res.json();
+        } catch (e) {
+            return { success: false, error: "Error de red o CORS" };
+        }
+    }
+
+    // Funciones visuales de carga
+    function mostrarLoading(mensaje) { document.getElementById('loading').style.display = 'block'; document.getElementById('loading').innerText = mensaje; }
+    function ocultarLoading() { document.getElementById('loading').style.display = 'none'; }
+    function mostrarMiniLoading() { document.getElementById('mini-loading').style.display = 'block'; }
+    function ocultarMiniLoading() { setTimeout(() => { document.getElementById('mini-loading').style.display = 'none'; }, 1000); }
+
+    function formatDateDDMMAA(dateInput) {
+        if (!dateInput) return '';
+        let dateObj = new Date(dateInput);
+        if (isNaN(dateObj.getTime())) return '';
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = String(dateObj.getFullYear()).slice(-2);
+        return `${day}/${month}/${year}`;
+    }
+
+    function formatForDateInput(dateInput) {
+        if (!dateInput) return '';
+        let d = new Date(dateInput);
+        if (isNaN(d.getTime())) return '';
+        return d.toISOString().split('T')[0];
+    }
+
+    function obtenerFechaLeyenda() {
+        let d = new Date();
+        return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+    }
+
+    async function iniciarSesion() {
+        const pin = document.getElementById('pin').value;
+        if(!pin) return;
+        mostrarLoading("Validando...");
+        const res = await apiCall({ action: 'login', pin: pin });
+        ocultarLoading();
+        
+        if (res.success) {
+            usuarioActual = res;
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('app-section').style.display = 'flex'; 
+            document.getElementById('fixed-footer').style.display = 'flex';
+            document.getElementById('user-info').innerText = `${res.nombre} (${res.rol.toUpperCase()})`;
+            
+            if(res.rol.toLowerCase() === 'gerencia') {
+                document.getElementById('panel-gerencia-botones').style.display = 'flex';
+                document.getElementById('filtro-visibilidad-gerencia').style.display = 'block';
+            }
+            cargarInventario();
+        } else {
+            document.getElementById('login-msg').innerText = "PIN Inválido";
+        }
+    }
+
+    async function cargarInventario() {
+        mostrarLoading("Descargando base de datos...");
+        const res = await apiCall({ action: 'getInventario' });
+        ocultarLoading();
+        if (res.success) {
+            inventarioGlobal = res.data;
+            poblarFiltros();
+            renderTable();
+        } else {
+            alert("Error al cargar inventario: " + res.error);
+        }
+    }
+
+    function poblarFiltros() {
+        const tipos = [...new Set(inventarioGlobal.map(i => i.TIPO))].filter(Boolean);
+        const colores = [...new Set(inventarioGlobal.map(i => i['COLOR EXTERIOR']))].filter(Boolean);
+        
+        const selectTipo = document.getElementById('filtro-tipo');
+        const selectColor = document.getElementById('filtro-color');
+        
+        selectTipo.innerHTML = '<option value="">Todos los Tipos</option>';
+        tipos.forEach(t => selectTipo.innerHTML += `<option value="${t}">${t}</option>`);
+        selectColor.innerHTML = '<option value="">Todos los Colores</option>';
+        colores.forEach(c => selectColor.innerHTML += `<option value="${c}">${c}</option>`);
+    }
+
+    function renderTable() {
+        const txtFilter = document.getElementById('filtro-texto').value.toLowerCase();
+        const tipoFilter = document.getElementById('filtro-tipo').value;
+        const colorFilter = document.getElementById('filtro-color').value;
+
+        let datosAFiltrar = [];
+        if (usuarioActual.rol.toLowerCase() === 'gerencia') {
+            const visibilidadFilter = document.getElementById('filtro-visibilidad-gerencia').value;
+            datosAFiltrar = visibilidadFilter === 'activo' ? inventarioGlobal.filter(item => !item['FECHA DE VENTA']) : inventarioGlobal;
+        } else {
+            datosAFiltrar = inventarioGlobal.filter(item => !item['FECHA DE VENTA']);
+        }
+
+        let filtrados = datosAFiltrar.filter(item => {
+            const matchTxt = Object.values(item).join(' ').toLowerCase().includes(txtFilter);
+            const matchTipo = tipoFilter ? item.TIPO === tipoFilter : true;
+            const matchColor = colorFilter ? item['COLOR EXTERIOR'] === colorFilter : true;
+            return matchTxt && matchTipo && matchColor;
+        });
+
+        const activosKpi = filtrados.filter(i => !i['FECHA DE VENTA']);
+        document.getElementById('kpi-disp').innerText = activosKpi.filter(i => i.STATUS === 'DISPONIBLE' && i.TIPO !== 'DEMO' && i.UBICACION !== 'ALLOCATION').length;
+        document.getElementById('kpi-alloc').innerText = activosKpi.filter(i => i.UBICACION === 'ALLOCATION').length;
+        document.getElementById('kpi-apart').innerText = activosKpi.filter(i => i.STATUS === 'APARTADO').length;
+        document.getElementById('kpi-demo').innerText = activosKpi.filter(i => i.TIPO === 'DEMO').length;
+
+        const headersTr = document.getElementById('table-headers');
+        let htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>DÍAS PISO</th><th>OBSERVACIONES</th><th>ACCIÓN</th>`;
+        if (usuarioActual.rol.toLowerCase() === 'gerencia') {
+            htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>FECHA COMPRA</th><th>DÍAS PISO</th><th>STATUS</th><th>OBSERVACIONES</th><th>REGISTRAR VENTA</th><th>ACCIONES</th>`;
+        }
+        headersTr.innerHTML = htmlHeaders;
+
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        
+        filtrados.forEach(item => {
+            let tr = document.createElement('tr');
+            
+            if(item['FECHA DE VENTA']) { 
+                tr.className = 'status-vendido'; 
+            } else if(item.STATUS === 'APARTADO') { 
+                tr.className = 'status-apartado'; 
+            } else if(parseInt(item['DIAS PISO']) > 150) {
+                tr.className = 'alerta-antiguedad';
+            }
+
+            let baseColsHtml = usuarioActual.rol.toLowerCase() === 'gerencia' ? `
+                <td><input type="text" class="table-input" value="${item.UBICACION || ''}" onblur="actualizarSegundoPlano(this, '${item.VIN}', 'UBICACION')"></td>
+                <td><input type="text" class="table-input" value="${item.TIPO || ''}" onblur="actualizarSegundoPlano(this, '${item.VIN}', 'TIPO')"></td>
+                <td>${item.AUTO || ''}</td><td>${item.MODELO || ''}</td><td>${item['COLOR EXTERIOR'] || ''}</td><td>${item['COLOR INTERIOR'] || ''}</td><td>${item.VIN || ''}</td>
+            ` : `<td>${item.UBICACION || ''}</td><td>${item.TIPO || ''}</td><td>${item.AUTO || ''}</td><td>${item.MODELO || ''}</td><td>${item['COLOR EXTERIOR'] || ''}</td><td>${item['COLOR INTERIOR'] || ''}</td><td>${item.VIN || ''}</td>`;
+
+            if (usuarioActual.rol.toLowerCase() === 'asesor') {
+                let btnHtml = item.STATUS === 'DISPONIBLE' ? `<button onclick="apartar('${item.VIN}')" class="btn">Apartar</button>` : `Apartado: ${item.ASESOR}`;
+                tr.innerHTML = baseColsHtml + `<td><span style="font-weight:bold; color:${item['DIAS PISO']>150 ? '#721c24' : 'inherit'};">${item['DIAS PISO'] || '-'}</span></td><td>${item.OBSERVACIONES || ''}</td><td>${btnHtml}</td>`;
+            } else {
+                let ventaColHtml = item['FECHA DE VENTA'] 
+                    ? `<span style="font-weight:bold;">Facturado: ${formatDateDDMMAA(item['FECHA DE VENTA'])}</span>` 
+                    : `<input type="date" onchange="vender('${item.VIN}', this.value)">`;
+
+                let colorDiasPiso = parseInt(item['DIAS PISO']) > 150 ? '#721c24' : '#002C5F';
+
+                tr.innerHTML = baseColsHtml + `
+                    <td><input type="date" class="table-input" value="${formatForDateInput(item['FECHA DE COMPRA'])}" onchange="actualizarFechaCompraLocal(this, '${item.VIN}')"></td>
+                    <td><span style="font-weight:bold; color:${colorDiasPiso};">${item['DIAS PISO'] || '-'}</span></td>
+                    <td>
+                        <select onchange="actualizarStatusGerencia(this, '${item.VIN}')">
+                            <option value="DISPONIBLE" ${item.STATUS==='DISPONIBLE'?'selected':''}>DISPONIBLE</option>
+                            <option value="APARTADO" ${item.STATUS==='APARTADO'?'selected':''}>APARTADO</option>
+                        </select>
+                    </td>
+                    <td><input type="text" class="table-input" value="${item.OBSERVACIONES || ''}" onblur="actualizarSegundoPlano(this, '${item.VIN}', 'OBSERVACIONES')" style="width: 150px;"></td>
+                    <td>${ventaColHtml}</td>
+                    <td style="text-align:center;"><button onclick="eliminarUnidad('${item.VIN}')" class="btn btn-danger">Borrar</button></td>
+                `;
+            }
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function actualizarSegundoPlano(input, vin, campo) {
+        let unidad = inventarioGlobal.find(i => i.VIN === vin);
+        if(!unidad || unidad[campo] === input.value) return; 
+        
+        unidad[campo] = input.value; 
+        mostrarMiniLoading();
+        const res = await apiCall({ action: 'actualizar', vin: vin, campo: campo, valor: input.value });
+        ocultarMiniLoading();
+        if(!res.success) { alert("Error en conexión. Por favor recarga la página."); }
+    }
+
+    async function actualizarFechaCompraLocal(input, vin) {
+        if(!input.value) return;
+        let unidad = inventarioGlobal.find(i => i.VIN === vin);
+        if(unidad) {
+            unidad['FECHA DE COMPRA'] = new Date(input.value + "T00:00:00").toISOString();
+            let ms = new Date().getTime() - new Date(unidad['FECHA DE COMPRA']).getTime();
+            unidad['DIAS PISO'] = Math.floor(ms / (1000 * 60 * 60 * 24));
+            if(unidad['DIAS PISO'] < 0) unidad['DIAS PISO'] = 0;
+            renderTable(); 
+        }
+        
+        mostrarMiniLoading();
+        await apiCall({ action: 'actualizar', vin: vin, campo: 'FECHA DE COMPRA', valor: input.value });
+        ocultarMiniLoading();
+    }
+
+    async function apartar(vin) {
+        let cliente = prompt("Nombre del Cliente (OBLIGATORIO para apartar):");
+        while (cliente !== null && cliente.trim() === "") {
+            cliente = prompt("El nombre es OBLIGATORIO. Ingrese el Nombre del Cliente:");
+        }
+        if(!cliente) return;
+        
+        let unidad = inventarioGlobal.find(i => i.VIN === vin);
+        if(unidad) {
+            let obsActual = unidad.OBSERVACIONES || '';
+            let nuevaLeyenda = `Apartado el ${obtenerFechaLeyenda()} por ${usuarioActual.nombre} para ${cliente}`;
+            let leyendaFinal = obsActual.trim() !== '' ? `${obsActual} | ${nuevaLeyenda}` : nuevaLeyenda;
+            
+            unidad.STATUS = 'APARTADO';
+            unidad.OBSERVACIONES = leyendaFinal;
+            unidad.ASESOR = usuarioActual.nombre;
+            renderTable();
+            
+            mostrarMiniLoading();
+            await apiCall({ action: 'apartar', vin: vin, asesor: usuarioActual.nombre, cliente: cliente });
+            await apiCall({ action: 'actualizar', vin: vin, campo: 'OBSERVACIONES', valor: leyendaFinal });
+            ocultarMiniLoading();
+        }
+    }
+
+    async function actualizarStatusGerencia(input, vin) {
+        let unidad = inventarioGlobal.find(i => i.VIN === vin);
+        if(!unidad) return;
+
+        if(input.value === 'APARTADO') {
+            let cliente = prompt("Nombre del Cliente (OBLIGATORIO para apartar):");
+            while (cliente !== null && cliente.trim() === "") {
+                cliente = prompt("El nombre es OBLIGATORIO para generar el apartado. Ingrese el Nombre del Cliente:");
+            }
+            if(!cliente) {
+                input.value = 'DISPONIBLE'; 
+                return;
+            }
+            
+            let obsActual = unidad.OBSERVACIONES || '';
+            let nuevaLeyenda = `Apartado el ${obtenerFechaLeyenda()} por ${usuarioActual.nombre} para ${cliente}`;
+            let leyendaFinal = obsActual.trim() !== '' ? `${obsActual} | ${nuevaLeyenda}` : nuevaLeyenda;
+            
+            unidad.STATUS = 'APARTADO';
+            unidad.OBSERVACIONES = leyendaFinal;
+            renderTable();
+
+            mostrarMiniLoading();
+            await apiCall({ action: 'apartar', vin: vin, asesor: usuarioActual.nombre, cliente: cliente });
+            await apiCall({ action: 'actualizar', vin: vin, campo: 'OBSERVACIONES', valor: leyendaFinal });
+            ocultarMiniLoading();
+            
+        } else {
+            unidad.STATUS = 'DISPONIBLE';
+            renderTable();
+            mostrarMiniLoading();
+            await apiCall({ action: 'actualizar', vin: vin, campo: 'STATUS', valor: 'DISPONIBLE' });
+            ocultarMiniLoading();
+        }
+    }
+
+    async function vender(vin, fecha) {
+        if(!fecha) return;
+        if(confirm("¿Confirmar venta (facturación)? La unidad se marcará como vendida.")){
+            let unidad = inventarioGlobal.find(i => i.VIN === vin);
+            if(unidad) {
+                unidad['FECHA DE VENTA'] = fecha;
+                unidad.STATUS = 'VENDIDO';
+                renderTable(); 
+            }
+            
+            mostrarMiniLoading();
+            await apiCall({ action: 'vender', vin: vin, fecha: fecha });
+            ocultarMiniLoading();
+        } else {
+            renderTable(); 
+        }
+    }
+
+    async function eliminarUnidad(vin) {
+        if(confirm(`¿ELIMINAR DEFINITIVAMENTE el registro con VIN ${vin}?`)){
+            mostrarLoading("Borrando de la base de datos...");
+            const res = await apiCall({ action: 'deleteUnidad', vin: String(vin).trim() });
+            if(res.success){
+                cargarInventario(); 
+            } else {
+                ocultarLoading(); alert("Error al eliminar: " + res.error);
+            }
+        }
+    }
+
+    // --- NUEVA FUNCIÓN: ARCHIVAR VENDIDOS ---
+    async function archivarVendidos() {
+        if(confirm("¿Estás seguro de archivar todos los autos VENDIDOS?\n\nEsto los moverá permanentemente a la pestaña 'Historico Vendidos' y limpiará el inventario principal para hacerlo más rápido.")) {
+            mostrarLoading("Archivando unidades. Esto puede tomar unos segundos...");
+            const res = await apiCall({ action: 'archivar' });
+            if(res.success) {
+                alert(`¡Éxito! Se archivaron ${res.cantidad} unidades correctamente.`);
+                cargarInventario(); // Recargamos para que desaparezcan de la memoria local
+            } else {
+                ocultarLoading();
+                alert("Error al archivar: " + res.error);
+            }
+        }
+    }
+
+    function procesarCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        mostrarLoading("Analizando CSV...");
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const lines = e.target.result.split(/\r?\n/); 
+                let result = [];
+                let headerIndex = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes('VIN') && lines[i].includes('UBICACION') && lines[i].includes('AUTO')) { headerIndex = i; break; }
+                }
+                if (headerIndex === -1) { alert("Error: CSV sin encabezados válidos."); ocultarLoading(); return; }
+
+                let headersRaw = lines[headerIndex].split(',').map(h => h.trim().toUpperCase());
+                
+                let idxFechaCompra1 = headersRaw.indexOf('FECHA COMPRA');
+                let idxFechaCompra2 = headersRaw.indexOf('FECHA DE COMPRA');
+                let idxFecha = headersRaw.indexOf('FECHA');
+                let colFecha = idxFechaCompra1 !== -1 ? idxFechaCompra1 : (idxFechaCompra2 !== -1 ? idxFechaCompra2 : idxFecha);
+
+                const colsRequeridas = {
+                    UBICACION: headersRaw.indexOf('UBICACION'), TIPO: headersRaw.indexOf('TIPO'),
+                    AUTO: headersRaw.indexOf('AUTO'), MODELO: headersRaw.indexOf('MODELO'),
+                    COLOREXTERIOR: headersRaw.indexOf('COLOR EXTERIOR'), COLORINTERIOR: headersRaw.indexOf('COLOR INTERIOR'), VIN: headersRaw.indexOf('VIN'),
+                    FECHA: colFecha
+                };
+
+                for(let i = headerIndex + 1; i < lines.length; i++){
+                    let lineStr = lines[i].trim();
+                    if(!lineStr || lineStr.replace(/,/g, '').length === 0) continue;
+                    let currentline = lineStr.split(',');
+                    let obj = {
+                        UBICACION: currentline[colsRequeridas.UBICACION] ? currentline[colsRequeridas.UBICACION].trim() : "",
+                        TIPO: currentline[colsRequeridas.TIPO] ? currentline[colsRequeridas.TIPO].trim() : "",
+                        AUTO: currentline[colsRequeridas.AUTO] ? currentline[colsRequeridas.AUTO].trim() : "",
+                        MODELO: currentline[colsRequeridas.MODELO] ? currentline[colsRequeridas.MODELO].trim() : "",
+                        'COLOR EXTERIOR': currentline[colsRequeridas.COLOREXTERIOR] ? currentline[colsRequeridas.COLOREXTERIOR].trim() : "",
+                        'COLOR INTERIOR': currentline[colsRequeridas.COLORINTERIOR] ? currentline[colsRequeridas.COLORINTERIOR].trim() : "",
+                        VIN: currentline[colsRequeridas.VIN] ? currentline[colsRequeridas.VIN].trim() : ""
+                    };
+                    
+                    if(colsRequeridas.FECHA !== -1 && currentline[colsRequeridas.FECHA]) {
+                        let rawDate = currentline[colsRequeridas.FECHA].trim();
+                        let match = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+                        if (match) {
+                            let dia = match[1].padStart(2, '0');
+                            let mes = match[2].padStart(2, '0');
+                            let anio = match[3];
+                            if(anio.length === 2) anio = "20" + anio;
+                            obj['FECHA DE COMPRA'] = `${anio}-${mes}-${dia}`;
+                        } else {
+                            obj['FECHA DE COMPRA'] = rawDate;
+                        }
+                    }
+
+                    if(obj.VIN) { result.push(obj); }
+                }
+                mostrarLoading(`Sincronizando ${result.length} unidades al servidor...`);
+                const res = await apiCall({ action: 'importar', filas: result });
+                if(res.success) { 
+                    alert(`Proceso exitoso. Unidades cargadas/actualizadas: ${res.agregados || res.actualizados || 'Completado'}.`); 
+                    cargarInventario(); 
+                } else { 
+                    ocultarLoading(); alert("Error del Servidor: " + res.error); 
+                }
+            } catch(err) { ocultarLoading(); alert("Error procesando el CSV: " + err.message); } 
+            finally { document.getElementById('file-csv').value = ""; }
+        };
+        reader.readAsText(file);
+    }
+
+    function exportarExcel() {
+        mostrarLoading("Generando Excel con formato...");
+        
+        setTimeout(() => {
+            let tablaOriginal = document.getElementById('tabla-inventario');
+            let tablaClon = tablaOriginal.cloneNode(true);
+            
+            let inputs = tablaClon.querySelectorAll('input');
+            inputs.forEach(input => {
+                let span = document.createElement('span');
+                span.innerText = input.value || '';
+                input.parentNode.replaceChild(span, input);
+            });
+
+            let selects = tablaClon.querySelectorAll('select');
+            selects.forEach(select => {
+                let span = document.createElement('span');
+                span.innerText = select.options[select.selectedIndex].text || '';
+                select.parentNode.replaceChild(span, select);
+            });
+
+            let rows = tablaClon.querySelectorAll('tr');
+            rows.forEach(row => {
+                if(row.lastElementChild) {
+                    row.removeChild(row.lastElementChild);
+                }
+
+                if (row.classList.contains('alerta-antiguedad')) {
+                    row.style.backgroundColor = '#FCE4E4';
+                    row.style.color = '#721c24';
+                } else if (row.classList.contains('status-apartado')) {
+                    row.style.backgroundColor = '#ffeeba';
+                } else if (row.classList.contains('status-vendido')) {
+                    row.style.backgroundColor = '#d1ecf1';
+                    row.style.color = '#0c5460';
+                }
+
+                let cells = row.children;
+                for (let i = 0; i < cells.length; i++) {
+                    cells[i].style.border = '1px solid #ddd';
+                    if (cells[i].tagName.toUpperCase() === 'TH') {
+                        cells[i].style.backgroundColor = '#002C5F';
+                        cells[i].style.color = '#FFFFFF';
+                    }
+                }
+            });
+
+            let htmlContent = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="utf-8"></head>
+            <body>${tablaClon.outerHTML}</body>
+            </html>`;
+
+            let blob = new Blob(['\ufeff', htmlContent], { type: 'application/vnd.ms-excel' });
+            let url = URL.createObjectURL(blob);
+            let link = document.createElement("a");
+            link.href = url;
+            link.download = `Inventario_Coatzacoalcos_${formatDateDDMMAA(new Date()).replace(/\//g, '')}.xls`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            ocultarLoading();
+        }, 100);
+    }
+</script>
+</body>
+</html>
