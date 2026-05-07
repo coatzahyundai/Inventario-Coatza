@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Inventario | Hyundai Coatzacoalcos v2.5 (Fast UI + Archivo)</title>
+    <title>Inventario | Hyundai Coatzacoalcos v2.6 (Fast UI + AutoRefresh)</title>
     <style>
         :root {
             --hyundai-blue: #002C5F;
@@ -35,7 +35,8 @@
         
         .status-apartado { background-color: #ffeeba !important; }
         .status-vendido { background-color: #d1ecf1 !important; color: #0c5460; }
-        .alerta-antiguedad { background-color: #FCE4E4 !important; color: #721c24; }
+        /* Cambio de color solicitado */
+        .alerta-antiguedad { background-color: #ebf3e7 !important; color: #721c24; } 
         
         .table-input { width: 90%; border: 1px solid transparent; background: transparent; padding: 2px; font-size: var(--table-font-size); font-family: var(--font-main);}
         .table-input:focus { border-color: var(--hyundai-blue); background-color: white; border-radius: 3px;}
@@ -61,9 +62,8 @@
         .btn-warning:hover { background-color: #e0a800; }
         
         #loading { text-align: center; display: none; color: white; font-weight: bold; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,44,95,0.8); padding: 5px 15px; border-radius: 15px; z-index: 200;}
-        
-        /* Mini indicador de guardado en segundo plano */
         #mini-loading { position: fixed; bottom: 130px; right: 20px; background: rgba(40, 167, 69, 0.9); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; display: none; z-index: 150; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        #sync-indicator { position: fixed; top: 10px; right: 20px; background: rgba(255, 255, 255, 0.8); color: var(--hyundai-blue); padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; display: none; z-index: 150;}
     </style>
 </head>
 <body>
@@ -116,7 +116,7 @@
         </div>
 
         <div style="display:flex; justify-content: space-between; align-items: flex-end;">
-            <div style="font-size:10px; color:rgba(255,255,255,0.7);">SISTEMA DE INVENTARIO V2.5 (Fast UI) | HYUNDAI COATZACOALCOS</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.7);">SISTEMA DE INVENTARIO V2.6 (Fast UI + AutoSync) | HYUNDAI COATZACOALCOS</div>
             
             <div id="panel-gerencia-botones" style="display: none; gap: 8px;">
                 <input type="file" id="file-csv" accept=".csv" style="display:none;" onchange="procesarCSV(event)">
@@ -129,11 +129,13 @@
 
     <p id="loading">Sincronizando...</p>
     <div id="mini-loading">✓ Guardando en la nube...</div>
+    <div id="sync-indicator">↻ Sincronizando...</div>
 
 <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzAsfmiOwFVgq082UwC4ZTh7faMk4M2zUnifYuJ_Go65P4DKGDzF3pGKTUGO5BwOKxx1A/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzpB0xayBuwZLV_n_pKTA52uM6cLZfkS8sPnvOhwMMSzMuSPL_vA8Bi_gCGsgnmJRCoPg/exec';
     let inventarioGlobal = [];
     let usuarioActual = {};
+    let syncInterval;
 
     async function apiCall(data) {
         try {
@@ -190,7 +192,10 @@
                 document.getElementById('panel-gerencia-botones').style.display = 'flex';
                 document.getElementById('filtro-visibilidad-gerencia').style.display = 'block';
             }
-            cargarInventario();
+            await cargarInventario();
+            
+            // Iniciar sincronización automática silenciosa cada 60 segundos
+            syncInterval = setInterval(cargarInventarioSilencioso, 60000);
         } else {
             document.getElementById('login-msg').innerText = "PIN Inválido";
         }
@@ -206,6 +211,24 @@
             renderTable();
         } else {
             alert("Error al cargar inventario: " + res.error);
+        }
+    }
+
+    // Función de sincronización que no bloquea la pantalla y verifica si el usuario está editando
+    async function cargarInventarioSilencioso() {
+        // Evitar actualizar la tabla si el usuario está tecleando en algún input o select
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) {
+            return;
+        }
+        
+        document.getElementById('sync-indicator').style.display = 'block';
+        const res = await apiCall({ action: 'getInventario' });
+        document.getElementById('sync-indicator').style.display = 'none';
+        
+        if (res.success) {
+            inventarioGlobal = res.data;
+            // No repoblamos filtros para no resetearlos de golpe, solo renderizamos
+            renderTable();
         }
     }
 
@@ -249,9 +272,11 @@
         document.getElementById('kpi-demo').innerText = activosKpi.filter(i => i.TIPO === 'DEMO').length;
 
         const headersTr = document.getElementById('table-headers');
-        let htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>DÍAS PISO</th><th>OBSERVACIONES</th><th>ACCIÓN</th>`;
+        
+        // Cambio Visual: 'DÍAS PISO' ahora es 'DP'
+        let htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>DP</th><th>OBSERVACIONES</th><th>ACCIÓN</th>`;
         if (usuarioActual.rol.toLowerCase() === 'gerencia') {
-            htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>FECHA COMPRA</th><th>DÍAS PISO</th><th>STATUS</th><th>OBSERVACIONES</th><th>REGISTRAR VENTA</th><th>ACCIONES</th>`;
+            htmlHeaders = `<th>UBICACIÓN</th><th>TIPO</th><th>AUTO</th><th>MODELO</th><th>COLOR EXT</th><th>COLOR INT</th><th>VIN</th><th>FECHA COMPRA</th><th>DP</th><th>STATUS</th><th>OBSERVACIONES</th><th>REGISTRAR VENTA</th><th>ACCIONES</th>`;
         }
         headersTr.innerHTML = htmlHeaders;
 
@@ -265,7 +290,7 @@
                 tr.className = 'status-vendido'; 
             } else if(item.STATUS === 'APARTADO') { 
                 tr.className = 'status-apartado'; 
-            } else if(parseInt(item['DIAS PISO']) > 150) {
+            } else if(parseInt(item['DIAS PISO']) >= 150) {
                 tr.className = 'alerta-antiguedad';
             }
 
@@ -277,13 +302,13 @@
 
             if (usuarioActual.rol.toLowerCase() === 'asesor') {
                 let btnHtml = item.STATUS === 'DISPONIBLE' ? `<button onclick="apartar('${item.VIN}')" class="btn">Apartar</button>` : `Apartado: ${item.ASESOR}`;
-                tr.innerHTML = baseColsHtml + `<td><span style="font-weight:bold; color:${item['DIAS PISO']>150 ? '#721c24' : 'inherit'};">${item['DIAS PISO'] || '-'}</span></td><td>${item.OBSERVACIONES || ''}</td><td>${btnHtml}</td>`;
+                tr.innerHTML = baseColsHtml + `<td><span style="font-weight:bold; color:${item['DIAS PISO']>=150 ? '#721c24' : 'inherit'};">${item['DIAS PISO'] || '-'}</span></td><td>${item.OBSERVACIONES || ''}</td><td>${btnHtml}</td>`;
             } else {
                 let ventaColHtml = item['FECHA DE VENTA'] 
                     ? `<span style="font-weight:bold;">Facturado: ${formatDateDDMMAA(item['FECHA DE VENTA'])}</span>` 
                     : `<input type="date" onchange="vender('${item.VIN}', this.value)">`;
 
-                let colorDiasPiso = parseInt(item['DIAS PISO']) > 150 ? '#721c24' : '#002C5F';
+                let colorDiasPiso = parseInt(item['DIAS PISO']) >= 150 ? '#721c24' : '#002C5F';
 
                 tr.innerHTML = baseColsHtml + `
                     <td><input type="date" class="table-input" value="${formatForDateInput(item['FECHA DE COMPRA'])}" onchange="actualizarFechaCompraLocal(this, '${item.VIN}')"></td>
@@ -421,14 +446,13 @@
         }
     }
 
-    // --- NUEVA FUNCIÓN: ARCHIVAR VENDIDOS ---
     async function archivarVendidos() {
         if(confirm("¿Estás seguro de archivar todos los autos VENDIDOS?\n\nEsto los moverá permanentemente a la pestaña 'Historico Vendidos' y limpiará el inventario principal para hacerlo más rápido.")) {
             mostrarLoading("Archivando unidades. Esto puede tomar unos segundos...");
             const res = await apiCall({ action: 'archivar' });
             if(res.success) {
                 alert(`¡Éxito! Se archivaron ${res.cantidad} unidades correctamente.`);
-                cargarInventario(); // Recargamos para que desaparezcan de la memoria local
+                cargarInventario(); // Recargamos la tabla
             } else {
                 ocultarLoading();
                 alert("Error al archivar: " + res.error);
@@ -537,7 +561,8 @@
                 }
 
                 if (row.classList.contains('alerta-antiguedad')) {
-                    row.style.backgroundColor = '#FCE4E4';
+                    // Color actualizado para el Excel
+                    row.style.backgroundColor = '#ebf3e7';
                     row.style.color = '#721c24';
                 } else if (row.classList.contains('status-apartado')) {
                     row.style.backgroundColor = '#ffeeba';
